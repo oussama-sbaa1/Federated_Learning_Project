@@ -105,9 +105,12 @@ class ParticipantService {
           this.processedRounds.add(roundKey);
         }
       } else if (state === 'FINISHED' || state === 2) {
-        console.log(`[${this.participantId}] Job finished. Stopping participant.`);
-        this.stop();
-        return;
+        if (this.knownJobs.size > 0) {
+          console.log(`[${this.participantId}] Job finished. Stopping participant.`);
+          this.stop();
+          return;
+        }
+        // Coordinator has completed jobs from an earlier run; keep waiting for a new task
       } else {
         // State WAIT (0)
         // Heartbeat log at lower verbosity
