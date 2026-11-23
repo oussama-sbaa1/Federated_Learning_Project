@@ -1,0 +1,13 @@
+{
+  "name": "federated-learning-participant",
+  "version": "1.0.0",
+  "description": "Participant Service for Federated Learning (Node.js)",
+  "main": "participant.js",
+  "scripts": {
+    "start": "node participant.js"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.7",
+    "@grpc/proto-loader": "^0.8.1"
+  }
+}
