@@ -1,15 +1,16 @@
 # How to Run the Participant Service
 
-This guide walks through running the Federated Learning participants alongside the Python coordinator and the Node.js management CLI.
+This guide walks through running the Federated Learning participants alongside the Python coordinator and the Node.js management CLI using **`uv`**.
 
 ## Prerequisites
 
 - **Node.js** 18 or higher
-- **Python** 3.10 or higher with the project virtual environment (`.venv`) containing `flwr`, `grpcio`, and `numpy`
+- **uv** (Python package and project manager) with Python 3.11+
 
-Install the Node.js dependencies from the repository root (`Federated_Learning_Project`):
+From the repository root (`Federated_Learning_Project`), sync the Python environment and install the Node.js dependencies:
 
 ```powershell
+uv sync
 npm install --prefix participants
 npm install --prefix cli
 ```
@@ -24,7 +25,7 @@ To verify the full multi-language workflow in one command, run:
 node participants/test_integration.js
 ```
 
-This script starts the Python coordinator, launches one Node.js Flower participant (`flower_node_1`) and one Python Flower participant (`flower_py_2`), creates a 2-round job, and prints the FedAvg updates until the job finishes.
+This script uses `uv run` to start the Python coordinator, launches one Node.js Flower participant (`flower_node_1`) and one Python Flower participant (`flower_py_2`), creates a 2-round job, and prints the FedAvg updates until the job finishes.
 
 ---
 
@@ -32,11 +33,11 @@ This script starts the Python coordinator, launches one Node.js Flower participa
 
 Open four PowerShell terminals at the repository root (`Federated_Learning_Project`).
 
-### Terminal 1 — Start the Coordinator (Python)
+### Terminal 1 — Start the Coordinator (Python via `uv`)
 
 ```powershell
 $env:PYTHONPATH="coordinator"
-.\.venv\Scripts\python coordinator/server.py
+uv run python coordinator/server.py
 ```
 
 Wait until you see:
@@ -56,16 +57,16 @@ node participants/participant.js flower_node_1 10,10,10 localhost:50051
 node participants/participant.js flower_node_1 participants/data_A.csv localhost:50051
 ```
 
-### Terminal 3 — Start Participant 2 (Python + Flower AI)
+### Terminal 3 — Start Participant 2 (Python + Flower AI via `uv`)
 
 ```powershell
 $env:PYTHONPATH="coordinator;participants"
 
 # Inline vector
-.\.venv\Scripts\python participants/participant.py flower_py_2 30,30,30 localhost:50051
+uv run python participants/participant.py flower_py_2 30,30,30 localhost:50051
 
 # Or load from a file
-.\.venv\Scripts\python participants/participant.py flower_py_2 participants/data_B.json localhost:50051
+uv run python participants/participant.py flower_py_2 participants/data_B.json localhost:50051
 ```
 
 ### Terminal 4 — Create, Start, and Watch the Job (Management CLI)
