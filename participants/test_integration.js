@@ -1,14 +1,13 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-console.log('=== Starting Flower AI Cross-Language Integration Test ===');
+console.log('=== Starting Flower AI Cross-Language Integration Test (uv) ===');
 
 const projectRoot = path.resolve(__dirname, '..');
-const venvPython = path.join(projectRoot, '.venv', 'Scripts', 'python.exe');
 
-// 1. Start Python Coordinator Server
-console.log('1. Starting Coordinator Service (Python)...');
-const coordinator = spawn(venvPython, ['coordinator/server.py'], {
+// 1. Start Python Coordinator Server via uv
+console.log('1. Starting Coordinator Service (uv run python)...');
+const coordinator = spawn('uv', ['run', '--no-sync', 'python', 'coordinator/server.py'], {
   cwd: projectRoot,
   env: { ...process.env, PYTHONPATH: path.join(projectRoot, 'coordinator') }
 });
@@ -24,18 +23,21 @@ setTimeout(() => {
   });
   participant1.stdout.on('data', (d) => process.stdout.write(`[Node Flower P1] ${d}`));
 
-  // 3. Start Participant 2 (Direct Python Flower NumPyClient)
-  console.log('3. Starting Participant 2 (Python Flower NumPyClient)...');
-  const participant2 = spawn(venvPython, ['participants/participant.py', 'flower_py_2', '30,30,30'], {
+  // 3. Start Participant 2 (Direct Python Flower NumPyClient via uv)
+  console.log('3. Starting Participant 2 (uv run python Flower NumPyClient)...');
+  const participant2 = spawn('uv', ['run', '--no-sync', 'python', 'participants/participant.py', 'flower_py_2', '30,30,30'], {
     cwd: projectRoot,
-    env: { ...process.env, PYTHONPATH: `${path.join(projectRoot, 'coordinator')};${path.join(projectRoot, 'participants')}` }
+    env: { ...process.env, PYTHONPATH: `${path.join(projectRoot, 'coordinator')}${path.delimiter}${path.join(projectRoot, 'participants')}` }
   });
   participant2.stdout.on('data', (d) => process.stdout.write(`[Python Flower P2] ${d}`));
 
   // 4. Trigger training job from client
   setTimeout(() => {
     console.log('4. Creating and starting training job from client...');
-    const client = spawn(venvPython, [
+    const client = spawn('uv', [
+      'run',
+      '--no-sync',
+      'python',
       '-c',
       `
 import time, grpc, sys

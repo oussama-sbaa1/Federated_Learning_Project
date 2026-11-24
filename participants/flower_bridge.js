@@ -1,15 +1,16 @@
 const { spawn } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 
 /**
- * Node.js bridge to Flower AI Client.
- * When training is triggered, it can delegate the fit() step to the Flower Python Client.
+ * Node.js bridge to Flower AI Client using uv.
+ * Delegates the local fit() training step to the Flower Python NumPyClient.
  */
 class FlowerBridgeTrainer {
   constructor(participantId, localData = [10, 10, 10]) {
     this.participantId = participantId;
     this.localData = localData;
-    this.pythonPath = path.resolve(__dirname, '..', '.venv', 'Scripts', 'python.exe');
+    this.projectRoot = path.resolve(__dirname, '..');
   }
 
   getNumSamples() {
@@ -17,7 +18,25 @@ class FlowerBridgeTrainer {
   }
 
   /**
-   * Delegates local training step to Flower NumPyClient in Python
+   * Resolves the uv command or virtual environment Python executable.
+   */
+  getPythonCommand(script) {
+    const winVenv = path.join(this.projectRoot, '.venv', 'Scripts', 'python.exe');
+    const unixVenv = path.join(this.projectRoot, '.venv', 'bin', 'python');
+    if (fs.existsSync(winVenv) || fs.existsSync(unixVenv)) {
+      return {
+        cmd: 'uv',
+        args: ['run', '--no-sync', 'python', '-c', script]
+      };
+    }
+    return {
+      cmd: 'uv',
+      args: ['run', 'python', '-c', script]
+    };
+  }
+
+  /**
+   * Delegates local training step to Flower NumPyClient in Python via uv
    */
   async train(globalWeights, config) {
     return new Promise((resolve, reject) => {
@@ -42,7 +61,8 @@ res = {
 print(json.dumps(res))
 `;
 
-      const py = spawn(this.pythonPath, ['-c', script], {
+      const { cmd, args } = this.getPythonCommand(script);
+      const py = spawn(cmd, args, {
         cwd: __dirname,
         env: { ...process.env, PYTHONPATH: __dirname }
       });
