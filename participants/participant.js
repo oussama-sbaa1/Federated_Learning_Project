@@ -4,6 +4,7 @@ const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const { LocalModelTrainer } = require('./model');
 const { FlowerBridgeTrainer } = require('./flower_bridge');
+const { LinearRegressionTrainer } = require('./linear_trainer');
 
 // Load proto definitions
 const PROTO_PATH = path.resolve(__dirname, '..', 'proto', 'federated.proto');
@@ -23,9 +24,22 @@ class ParticipantService {
     this.serverAddress = options.serverAddress || 'localhost:50051';
     this.pollIntervalMs = options.pollIntervalMs || 1000;
     this.useFlower = options.useFlower !== undefined ? options.useFlower : true;
-    this.trainer = this.useFlower
-      ? new FlowerBridgeTrainer(this.participantId, options.localData || [10, 10, 10])
-      : new LocalModelTrainer(this.participantId, options.localData);
+    // Auto-registration can be disabled (AUTO_REGISTER=false) so that the CLI registers the participant
+    this.autoRegister = options.autoRegister !== undefined
+      ? options.autoRegister
+      : process.env.AUTO_REGISTER !== 'false';
+
+    // Trainer selection:
+    //   1) regression CSV file ("x,y" header)  -> LinearRegressionTrainer
+    //   2) otherwise Flower bridge or the simple local vector trainer
+    if (options.regressionFile) {
+      this.trainer = new LinearRegressionTrainer(this.participantId, options.regressionFile);
+    } else if (this.useFlower) {
+      this.trainer = new FlowerBridgeTrainer(this.participantId, options.localData || [10, 10, 10]);
+    } else {
+      this.trainer = new LocalModelTrainer(this.participantId, options.localData);
+    }
+
     this.client = new federatedProto.Coordinator(
       this.serverAddress,
       grpc.credentials.createInsecure()
@@ -82,7 +96,7 @@ class ParticipantService {
           const incomingWeights = (task.global_weights && task.global_weights.weights) || [];
           console.log(`[${this.participantId}] Current global weights:`, incomingWeights);
 
-          // Local training step via Flower AI or local trainer
+          // Local training step (regression, Flower AI or local vector trainer)
           const { updatedWeights, loss, numSamples } = await this.trainer.train(
             incomingWeights,
             task.config
@@ -126,10 +140,14 @@ class ParticipantService {
 
   async start() {
     console.log(`[${this.participantId}] Starting participant service. Connecting to ${this.serverAddress}...`);
-    try {
-      await this.register();
-    } catch (err) {
-      console.warn(`[${this.participantId}] Continuing execution in polling loop...`);
+    if (this.autoRegister) {
+      try {
+        await this.register();
+      } catch (err) {
+        console.warn(`[${this.participantId}] Continuing execution in polling loop...`);
+      }
+    } else {
+      console.log(`[${this.participantId}] Auto-registration disabled. Register this participant with the CLI.`);
     }
 
     this.isRunning = true;
@@ -144,27 +162,35 @@ class ParticipantService {
 }
 
 // CLI execution handling
+// Usage: node participant.js <participant_id> <data_file_or_values> [coordinator_address]
+//   data_file_or_values:
+//     - regression CSV file whose first line is "x,y"      (e.g. data_A.csv)
+//     - other file path (.json / .csv / .txt of numbers)
+//     - comma-separated values (e.g. "10,12,15")
 if (require.main === module) {
   const args = process.argv.slice(2);
   const participantId = args[0] || `participant_${Math.random().toString(36).substring(2, 6)}`;
-  
-  // Custom local data can be passed as:
-  // 1) File path (e.g. data_A.csv or data_A.json)
-  // 2) Comma-separated values (e.g. "10,12,15")
+
   let localData = null;
+  let regressionFile = null;
+
   if (args[1]) {
     const rawInput = args[1].trim();
     if (fs.existsSync(rawInput)) {
       try {
         const content = fs.readFileSync(rawInput, 'utf8').trim();
-        if (rawInput.endsWith('.json')) {
+        if (/^x\s*,\s*y/i.test(content)) {
+          // Regression dataset (x,y rows)
+          regressionFile = rawInput;
+          console.log(`Using regression dataset: ${rawInput}`);
+        } else if (rawInput.endsWith('.json')) {
           const parsed = JSON.parse(content);
           localData = Array.isArray(parsed) ? parsed.map(Number) : parsed.data.map(Number);
         } else {
           // CSV / txt: comma, space or newline separated
           localData = content.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
         }
-        console.log(`Loaded ${localData.length} samples from file: ${rawInput}`);
+        if (localData) console.log(`Loaded ${localData.length} samples from file: ${rawInput}`);
       } catch (err) {
         console.warn(`Could not parse file ${rawInput}: ${err.message}. Falling back.`);
       }
@@ -183,6 +209,7 @@ if (require.main === module) {
   const service = new ParticipantService({
     participantId,
     localData,
+    regressionFile,
     serverAddress
   });
 
