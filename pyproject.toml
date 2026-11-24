@@ -1,0 +1,18 @@
+[project]
+name = "federated-learning-project"
+version = "0.1.0"
+description = "Minimal Federated Learning Framework Using gRPC, Node.js, and Flower AI"
+readme = "README.md"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "flwr>=1.44.0",
+    "grpcio>=1.85.3",
+    "grpcio-tools>=1.85.3",
+    "numpy>=2.0.0",
+    "protobuf>=7.35.1,<8.0.0",
+]
+
+[tool.uv]
+override-dependencies = [
+    "protobuf>=7.35.1,<8.0.0",
+]
