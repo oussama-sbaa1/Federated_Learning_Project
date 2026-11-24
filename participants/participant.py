@@ -65,6 +65,7 @@ class FlowerParticipantService:
                     if round_key not in self.processed_rounds:
                         print(f"[{self.participant_id}] Flower AI received task for Job {task.job_id}, Round {task.round_number}")
                         incoming_weights = list(task.global_weights.weights)
+                        print(f"[{self.participant_id}] Current global weights: {incoming_weights}")
 
                         # Package config for Flower NumPyClient
                         config = {
@@ -78,6 +79,7 @@ class FlowerParticipantService:
 
                         updated_weights = updated_params[0].tolist()
                         loss = float(metrics.get("loss", 0.0))
+                        print(f"[{self.participant_id}] Local weights update: {updated_weights}")
 
                         # Submit updated weights to Coordinator via gRPC
                         result_msg = pb.TrainingResult(
